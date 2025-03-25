@@ -10,6 +10,32 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 1
     ```
 
+    1A. (optional) If you are reducing bright QSOs we suggest to use a different [configuration file 'kcwi_qso_saturated'](../configs/kcwi_qso_saturated.cfg) and to create cosmic ray masks to reduce confusion in the bright traces of the raw data i.e., mask out the core of the bright QSO traces where the cosmic ray rejection cannot determine cosmic rays vs bright flux
+
+    Create masks that box in the brightest portions of the QSO traces. Ensure the region file is named as e.g., ```kb240904_00057_bcrr.reg``` and saved in physical coordinates. Then convert the masks to binary fits images using the following example
+
+    ``` bash
+    python ~path/to/kcwiki/scripts/kcwi_masksky_ds9_bcrr.py kb240904_00057.fits kb240904_00057_bcrr.reg
+    ```
+
+    Toggle the bcrmsk flag and clobber in the config file [configuration file 'kcwi_qso_saturated'](../configs/kcwi_qso_saturated.cfg)
+
+    ```bcrmsk=True```,
+    ```clobber=True```
+
+    Re-run the step 1 reduction on the frames affected or all frames
+
+    All files
+    ```bash
+        reduce_kcwi -b -f kb*.fits -g -c kcwi_qso_saturated.cfg -st 1
+    ```
+
+    Affected files
+    ```bash
+        reduce_kcwi -b -f kb240904_000{57..61}.fits -g -c kcwi_qso_saturated.cfg -st 1
+    ```
+
+
 2. (optional) Avoid oversubtraction in sky model. 
 
     Create sky masks to remove astronomical sources from the sky model. See [here](../docs/reg_construction.md) for details to create `region` masks and covert them to binary FITS files. 
