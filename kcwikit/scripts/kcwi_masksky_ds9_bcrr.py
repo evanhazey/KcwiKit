@@ -10,12 +10,12 @@ import os
 def main():
     """Creates mask image from ds9 region file.
 
-    To use this routine, process your data with default sky subtraction. Then
+    To use this routine, process your data with default cosimic ray rejection. Then
     display the target \*_intf.fits file in ds9. Use region shapes to indicate
     non-sky pixels in image (box, circle, etc.). Write out ds9 region file
     (\*.reg). Ensure the region file is in physical coordinates Then run this routine:
 
-        * ``python ~/kderp/devel/kcwi_masksky_ds9.py kb180101_00111.fits ds9_bcrr.reg``
+        * ``python ~/kderp/devel/kcwi_masksky_ds9.py kb180101_00111_intf.fits kb180101_00111_bcrr.reg``
 
     (replace paths/filenames with your local paths/filenames)
 
@@ -23,7 +23,7 @@ def main():
     re-run the pipeline.
 
     Args:
-        imagename (string): The name of a \*.fits image
+        imagename (string): The name of a \*_intf.fits image
         regionname (string): The name of a ds9 region file
 
     Returns:
@@ -37,7 +37,7 @@ def main():
     if narg != 3:
         print("Usage: kcwi_masksky_ds9_bcrr <imagename> <regionname>")
         print("imagename : used for array dimensions and filename purposes, ")
-        print("            must be an kb*.fit image.")
+        print("            must be an kb*_intf.fit image.")
         print("regionname: name of region file containing ds9 mask regions")
         print("            (typically a *_bcrr.reg)")
         exit()
@@ -56,7 +56,7 @@ def main():
         exit()
 
     # create output mask image name
-    outfile = imfname.replace(".fits", "_bcrmsk.fits")
+    outfile = imfname.replace("_intf.fits", "_bcrmsk.fits")
     print("Creating: "+outfile)
 
     # load the header from the pointed-to image.
