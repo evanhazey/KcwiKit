@@ -1,0 +1,106 @@
+Stacking Procedure Cookbook
+Cookbook style guide on stacking *_icubes.fits files using the stacking routine developed by Yuguang Chen.
+
+
+STACKING
+Goal: To stack multiple cubes of the same object to increase the sigfnal-to-noise ratio of each spaxel.
+1. Have *_Xcubes.fits files ready from either the IDL or Python DRP or PypeIt reduction
+	You'll need all of the cubes files for the fields i.e.,  *_ecubes.fits, *_icubes.fits, *_mcubes.fits, *_vcubes.fits in the redux directory
+2. Copy one of of the Jupyter Notebooks from the kbss-kcwi tier2drp directory on Mizar, then the *.list file, and the *.par file for the frame in the directory above (cd ..) the "redux" direcory
+	e.g., for the field containing quasar Q0100
+	scp enunez@mizar.caltech.edu:/scr/kbss-kcwi/tier2comb/q0100/q0100-QSO.ipynb .
+	scp enunez@mizar.caltech.edu:/scr/kbss-kcwi/tier2comb/q0100/q0100-QSO.list .
+	scp enunez@mizar.caltech.edu:/scr/kbss-kcwi/tier2comb/q0100/q0100-QSO.par .
+3. Open the Jupyter notebook and see if the modules are installed on your machine
+	--> kcwi.py (which contains the stacking script) can be found at mizar:/scr/yuguangchen/Soft/py/
+4. Open the *.list file in a text editor and change the name of the files to the frames that you want to stack
+	syntax: path_to_filename *1 space* bottom_cutoff_integer *1space* top_cutoff_integer
+		--> Only keep the top level name of the frame at the end of the path
+			e.g., kb171122_00122 NOT kb171122_00122_icubes.fits
+		The 'top_cutoff_integer' and 'bottom_cutoff_integer' refer to the number of pixels to be trimmed from the top/bpottom of cube and bottom of the cube, usually 3 3 works fine
+			e.g., pathtoredux/redux/kb171122_00122 3 3
+5. Load in the .list file
+	e.g., fn='q0100-QSO.list'
+6. Run kcwi.kcwi_align(fn,noalign=True) (this makes a '*.shift.list' file and white light images to show how well aligned the frames are
+7. Open the *thumb0.fits file in the new directory 'kcwi_align' then flip through the to see how well aligned the frames are
+		e.g., for quasars, make sure all of quasars in the frames are centered close x=50 and y=50 (if using 100x100 image size)
+	a. If the frames are aligned well, move to step 8.
+	b. Otherwise, make a new text file with the extension *.pre.list
+			e.g., q0100-QSO.pre.list
+		i. Copy the names of the files to be stacked into the file followed by 0 0
+			e.g., kb171122_00122 0 0
+			--> The numbers represent arcsecond shifts in RA and Dec of the field, we are going to try and line up the sources in the frame.
+		ii. Try different numbers then run kcwi_stack(noalign=True); Use "d" key in QFV to measure angular distance to 50,50; keep sign in tact
+		iii. Check to see if the objects are more aligned in the field by running kcwi.kcwi_align(fn,noalign=True), then viewing the *thumb0.fits file
+		iv. If they are aligned well, proceed to step 8
+		v. Otherwise, go back to step ii.
+8. Open the *.par file in a text editor
+	a. Set the dimension to whatever you like, usually 100x100
+		e.g., dimension 100 100
+	b. Set the align_box parameter by looking at the *thumb0.fits file and picking a box large enough to align the main bright objects in the field
+		syntax: align_box x1 y1 x2 y2; x1,y1 are the bottom left corners of the box, x2,y2 are the top right corner
+		e.g., align_box 7 15 73 60
+	c. Set orientation for what you want the final stacked frame to have
+		syntax: orientation deg_east_of_north
+	d. Set xpix and ypix; the spatial scale of the final stacked frames
+		syntax: x/ypix number; number is in arcseconds/pixel, usually 0.3 is used but with lots of frames 0.2 is an acceptable choice
+	e. (optional) Set search_size
+		Number of pixels for the program to find center of bright object, default is 10 and is fine if the frames are pre-aligned well
+	d. ref_* will be covered later in the astrometry section
+	e. Wavelength params to properly reproject the axis top the lowest resolution slicer configuration
+		wave_ref PIXEL# WAVELENGTH e.g.,1 3225 or CRPIX3 CRVAL3 (from FITS header)
+		nwave WAVELENGTHSARRAY e.g., 2601 or NAXIS3
+		dwave DELTALAMBDA e.g., 1 or CD3_3
+8. Run kcwi.kcwi_align(fn)
+	a. If no erros proceed to the next numbered step
+	b. If error raises that contains "r.argmin()" or "cannot cast shapes (x,y) and (a,b)" or "zero-dimension array" it means that the objects aren't aligned well enough
+		i. Go back to
+9. Run kcwi.kcwi_check_flux(fn, nsig=1.5) to check the relative flux of the frames
+10. Run kcwi.kcwi_stack(fn,overwrite=True)
+	Stack the frames!
+	If any errors, it is likely related to the alignment of the frames, go back to step 7bii
+
+
+ASTROMETRY
+Goal: To manually apply a more precise astrometry registration to the stacked cubes because the registrations given by the official DRP's aren't the best
+1. Open the *.par file in a text editor
+2. Find a photometric image of the field of interest either from NED, SIMBAD, or on mizar
+	--> HST pointings for all of the kbss-fields are at mizar:/scr/yuguangchen/kbss/img/HST
+	a. Set ref_fn in the par file to the path of the fits image
+		e.g., ref_fn pathtohstimage/q1009_wfc3.fits
+3. Open the fits image and find a bright object that is present in both the image and the kbss cube
+	a. Find the coordinates of the center of the bright object in decimal degrees
+		In ds9 WCS->Degrees to display the coordinates in decimal degrees
+	b. Set ref_ad with the coordinates of the bright object
+		e.g., ref_ad 152.9817 29.6949
+4. Open the stacked kcwi cube and find the center coordinates (in pixel units) of the same bright object used in the fits image
+	a. Set ref_xy with these coordinates
+		e.g., ref_xy 47 33
+	b. Set ref_box by making a box (in pixel units) around the bright object in the fits image
+		syntax: ref_box x1 y1 x2 y2; x1,y1 are the bottom left corners of the box, yx2,y2 are the top right corner
+5. Run kcwi.kcwi_astrometry(fn)
+	The cubes now have more accurate astrometry coordinates
+
+#ISSUES WITH CURRENT INSTALLATION
+'kcwi' version
+	- To run on the new data must let the program accept cubes with 5 extensions 
+		- In line 1829 of kcwi_stack
+			# additional trimming for PyDRP
+			if (len(hdulist)==4) or (len(hdulist)==5):
+		- In lines 1114 of kcwi_align
+            elif (len(hdulist)==4) or (len(hdulist)==5):
+                reduxflag = 'py'):
+'kcwikit' version 
+	- The "Issue6Fix" causes there to be significantly lower flux than what was intended in the original cube
+	- Added flag "issue6_flag" that toggles on these changes such that the changes are overidden 
+	- See changes below 
+		- Line 906-> crrthresh=100, medcube=False, nsigma_clip=10, npix_trim = 3, issue6_flag=False):
+		- Line 1397-> if issue6_flag:
+						# Hot fix for issue #6
+		- Line1509-> if not issue6_flag:
+                		newcube=fits.open(montfns[i])[0].data #/ fits.open(trimfn[i])[0].header['ISS6FIX']
+		- Line 1589-> if not issue6:
+                    	newcube=fits.open(montfns[i])[0].data #/ fits.open(trimfn[i])[0].header['ISS6FIX']
+
+
+					

@@ -1,0 +1,255 @@
+#Last updated TuesJan28
+Running KCWI pipeline
+  '> ' denotes that the following should be typed into the command line
+#####SETUP#####
+  We want to change into the KCWIDRP virtual environment
+  > command+space terminal
+  > zsh
+  > conda activate kcwidrp #Use conda to activate the new environment
+
+#To change back just type tcsh (or whatever other shell would be the best)
+  > tcsh
+
+#####RUNNING PIPELINE#####
+#####CURRENT#####
+#My receipe kind of, for running the DRP, based off https://github.com/yuguangchen1/KcwiKit/blob/master/kcwikit/docs/Running_blue_DRP.md 
+## BEFORE RUNNING ANYTHING ##
+-> Be sure to add KcwiKit and bin to your path and python path if kcwikit is not importing! 
+export PATH="/Users/evanhazenunez/opt/anaconda3/envs/kcwikit/bin:$PATH"
+export PYTHONPATH="/Users/evanhazenunez/opt/anaconda3/envs/kcwikit/bin:$PYTHONPATH"
+export PYTHONPATH="/Users/evanhazenunez/opt/anaconda3/envs/kcwikit:$PYTHONPATH"
+export PYTHONPATH="/Users/evanhazenunez/python/cit_scripts/KcwiKit:$PYTHONPATH"
+-> Alternatively, directly to the scripts instead of e.g., kcwi_masksky_ds9 redux, do
+python  OR python ~/python/cit_scripts/KcwiKit/kcwikit/scripts/kcwi_masksky_ds9.py redux/kb240902_00051_intf.fits redux/kb240902_00051.reg
+#BTW, Actual DRP path to the kcwikit env -> /Users/evanhazenunez/opt/anaconda3/envs/kcwikit/lib/python3.12/site-packages/kcwidrp-1.2.0-py3.12.egg/kcwidrp/
+
+
+##### BLUE SIDE REDUCTION #####
+## Stage 1 (fundamentals) ##
+conda activate kcwikit
+cd directory/with/blue/data
+cp /Users/evanhazenunez/python/cit_scripts/KcwiKit/kcwikit/pyDRP/configs/kcwi.cfg . (or '.../kcwi_qso_saturated.cfg .')
+-> Turn on clobber so all files get reprocessed (which they always will...)
+vs kcwi_qso_saturated.cfg
+clobber = True
+rm kcwib.proc
+-> (optional) If custom CRR mask is needed make region files on the raw frames
+->->Draw boxes around bright traces of the cube that would be hard for the CRR to detect (do not incase obvious cosmic rays)
+ds9 kb240904_00061.fits -regions load redux/kb240904_00061_bcrr.reg -height 800 -width 1400 -cmap cool -zscale -mode region -zoom to fit -regions shape box &
+-> Create binary fits mask for the region files
+python ~/python/cit_scripts/KcwiKit/kcwikit/scripts/kcwi_masksky_ds9_bcrr.py kb240904_00061.fits redux/kb240904_00061_bcrr.reg
+mv *bcrmsk* redux/
+-> Run stage 1
+reduce_kcwi -b -f kb240904_000{57..61}.fits -g -c kcwi_qso_saturated.cfg -st 1
+
+## Stage 2: Sky subtraction ##
+-> Box in continuum emission (save in Physics coords; for each object and star)
+ds9 redux/kb240904_00061_intf.fits -regions load redux/kb240904_00061.reg -height 800 -width 1400 -cmap cool -zscale -mode region -zoom to fit -regions shape box &
+-> Convert the region file to a binary fits mask
+kcwi_makemask redux
+->Re run all of stage 2
+-> Remove obj and sky from the .proc file
+vs kcwib.proc
+-> Remove old sky frames
+rm redux/*_sky.fits #rm redux/kb240904_000{57..61}_sky.fits
+reduce_kcwi -b -f kb*.fits -g -c kcwi_qso_saturated.cfg -st 2 #reduce_kcwi -b -f kb240904_000{57..61}.fits -g -c kcwi_qso_saturated.cfg -st 2
+
+
+## Stage 3 Removing scattered light and cube construction ##
+-> Make flat 2D images of the cubes (Still in slices but flat)
+kcwi_flatten_cube redux/kb*_icube.fits
+->-> Draw box regions around line emission (e.g., All Lya emission in seperate boxes; objects only; save in physical coords)
+ds9 redux/kb240904_00057_icube_2d.fits -regions load redux/kb240904_00057_icube_2d.reg -height 800 -width 1400 -zscale -mode region -smooth function boxcar -smooth radius 3 -smooth yes -regions shape box -zoom to fit &
+-> Make whitelight images (collapse cube in 3rd dimension)
+kcwi_collapse redux/kb*_icube.fits
+->-> Draw ellipse regions around continuum (object+stars; save in Physical coordinates) , then convert to binary fits
+ds9 redux/kb240904_00057_icube.thum.fits -regions load redux/kb240904_00057_icube.thum.reg -height 800 -width 1400 -zscale -mode region -regions shape ellipse -zoom to fit &
+-> Convert the region files to binary fits tables 
+kcwi_makemask_medfilter redux
+-> Perform Median filtering
+kcwi_medfilter --override redux/kb*_icube.fits #kcwi_medfilter --override redux/kb240904_000{57..61}_icube.fits
+->Remove obj and sky from the .proc files 
+vs kcwib.proc
+-> (optional) Change the plot verbose so that we can manually fit the standard star to reduce edge effects (if needed)
+vs kcwi_qso_saturated.cfg
+plot_level = 2
+-> Rerun stage 2-3
+rm redux/*ea*.fits
+rm redux/*invsens*.fits
+reduce_kcwi -b -f kb*.fits -g -c kcwi_qso_saturated.cfg -st 3 #reduce_kcwi -b -f kb240904_000{57..61}.fits -g -c kcwi_qso_saturated.cfg -st 3
+
+## Step 3 plus Standard star calibration ##
+-> Make *.list of files with *_invsens.fits into stars.list (full path)
+kcwi_combinestd stars.list
+-> Copy the star name and place it in the redux 
+cp stars_invsens.fits redux/stars_invsens_invsens.fits
+-> rename third to last and last column to stars_invsens.fits and remove all other INVSENS (multiples of observations), then remove object frames from the proc file
+from ---> |      80 | 5b906d4dce9e2434e0316846 | 2201009 |  INVSENS |  NONE |   10.0 | BLUE | Medium |   BL |   27.75 |  4499.87 | 2,2 | KBlue |    58433.645553 |     8 | invsens |  kb181111_00080.fits |               feige34 |   kb181111_00080.fits |
+to   ---> |      80 | 5b906d4dce9e2434e0316846 | 2201009 |  INVSENS |  NONE |   10.0 | BLUE | Medium |   BL |   27.75 |  4499.87 | 2,2 | KBlue |    58433.645553 |     8 | invsens |   stars_invsens.fits |               feige34 |   stars_invsens.fits |
+vs kcwib.proc
+stars_invsens.fits
+-> (optional) If custom fitted the stars 
+vs kcwi_qso_saturated.cfg
+plot_level = 1
+-> Rerun the standard star calibration
+rm redux/*icubes*.fits
+reduce_kcwi -b -f kb*.fits -g -c kcwi_qso_saturated.cfg -st 3
+
+-> Now onto stacking 
+vs /Users/evanhazenunez/cit_research/data/documentation_guides_cookbooks/stacking_and_astrometry_procedure_cookbook.txt
+
+##### RED SIDE REDUCTION #####
+## Stage 1 (fundamentals) ##
+conda activate kcwikit
+cd directory/with/red/data
+cp /Users/evanhazenunez/python/cit_scripts/KcwiKit/kcwikit/pyDRP/configs/kcwi.cfg .
+-> Turn on clobber so all files get reprocessed (which they always will...)
+vs kcwi.cfg
+clobber = True
+rm kcwib.proc
+reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 1
+
+## Stage 2: Sky subtraction ##
+-> Box in continuum emission (save in Physics coords; for each object and star)
+ds9 redux/kb240904_00054_intf.fits -regions load redux/kb240904_00054.reg -height 800 -width 1400 -cmap cool -zscale -mode region -zoom to fit -regions shape box &
+-> Convert the region file to a binary fits mask
+kcwi_makemask redux
+-> Remove obj and sky from the .proc file
+vs kcwib.proc
+-> Remove old sky frames
+rm redux/*_sky.fits
+reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 2
+
+## Stage 3 Removing scattered light and cube construction ##
+-> Make flat 2D images of the cubes (Still in slices but flat)
+kcwi_flatten_cube redux/kb*_icube.fits
+->-> Draw box regions around line emission (e.g., All Lya emission in seperate boxes; objects only; save in physical coords)
+ds9 redux/kb240902_00052_icube_2d.fits -regions load redux/kb240902_00052_icube_2d.reg -height 800 -width 1400 -zscale -mode region -smooth function boxcar -smooth radius 3 -smooth yes -regions shape box -zoom to fit &
+-> Make whitelight images (collapse cube in 3rd dimension)
+kcwi_collapse redux/kb*_icube.fits
+->-> Draw ellipse regions around continuum (object+stars; save in Physical coordinates) , then convert to binary fits
+ds9 redux/kb240902_00051_icube.thum.fits -regions load redux/kb240902_00051_icube.thum.reg -height 800 -width 1400 -zscale -mode region -regions shape ellipse -zoom to fit &
+-> Convert the region files to binary fits tables 
+kcwi_makemask_medfilter redux
+-> Perform Median filtering
+kcwi_medfilter --override redux/kb*_icube.fits
+->Remove obj and sky from the .proc files 
+vs kcwib.proc
+-> Change the plot verbose so that we can manually fit the standard star to reduce edge effects
+vs kcwi.cfg
+plot_level = 2
+rm redux/*ea*.fits
+rm redux/*invsens*.fits
+reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 3
+
+## Step 3 plus Standard star calibration ##
+-> Make *.list of files with *_invsens.fits into stars.list (full path)
+kcwi_combinestd stars.list
+-> Copy the star name and place it in the redux 
+cp stars_invsens.fits redux/stars_invsens_invsens.fits
+-> rename third to last and last column to stars_invsens.fits and remove all other INVSENS (multiples of observations), then remove object frames from the proc file
+from ---> |      80 | 5b906d4dce9e2434e0316846 | 2201009 |  INVSENS |  NONE |   10.0 | BLUE | Medium |   BL |   27.75 |  4499.87 | 2,2 | KBlue |    58433.645553 |     8 | invsens |  kb181111_00080.fits |               feige34 |   kb181111_00080.fits |
+to   ---> |      80 | 5b906d4dce9e2434e0316846 | 2201009 |  INVSENS |  NONE |   10.0 | BLUE | Medium |   BL |   27.75 |  4499.87 | 2,2 | KBlue |    58433.645553 |     8 | invsens |   stars_invsens.fits |               feige34 |   stars_invsens.fits |
+vs kcwib.proc
+stars_invsens.fits
+vs kcwi.cfg
+plot_level = 1
+rm redux/*icubes*.fits
+reduce_kcwi -b -f kb*.fits -g -c kcwi.cfg -st 3
+
+-> Now onto stacking 
+vs /Users/evanhazenunez/cit_research/data/documentation_guides_cookbooks/stacking_and_astrometry_procedure_cookbook.txt
+
+
+
+
+
+###OLD-ISH NOW###
+Following the 'master_reduce' script from Nik (https://github.com/yuguangchen1/kcwi/blob/master/pyDRP/master_reduce)
+#Note that I have aliased '.../kcwi/pyDRP/master_reduce' to reduce
+1) Input the science frames into a text file with a relevant name
+echo kb240904_00{054..61} | xargs -n 1 > sci.txt 
+  # Be sure to keep an empty line after the last object
+
+
+
+2a) If there are region files already and standard configuration file is fine
+master_reduce -o sci.txt
+
+
+
+2b) If there are region files AND a need for a non-standard configuration file (e.g., quasar saturation configuration)
+cd rawdatadirectory/
+cp /Users/evanhazenunez/python/cit_scripts/kcwi/pyDRP/kcwi_qso_saturated.cfg .
+master_reduce -o sci.txt -c kcwi_qso_saturated.cfg
+
+
+
+2c) If no region files then the reduction is broken up into three parts (example below requires qso_saturation files)
+2c1) Run stage 1 of the drp then make region files for the standard stars and objects, make sky regions files using the inktk.fits fields (see below for explanation)
+master_reduce -o sci.txt -s stage1drp
+or, if QSO saturated
+master_reduce -o sci.txt -c kcwi_qso_saturated.cfg -s stage1drp
+ds9 redux/kb240904_00092_intk.fits -regions load redux/kb240902_00091.reg -height 800 -width 1400 -cmap cool -zscale -mode region -zoom to fit -regions shape box &
+
+2c2) Run stage 2, then make region files of emission sources/features (obj only) in _2d.fits and continuum sources in _thum.fits files
+master_reduce -o sci.txt -s stage1plusToStage2pre
+or, if QSO saturated
+master_reduce -o sci.txt -c kcwi_qso_saturated.cfg -s stage1plusToStage2pre #if qso is saturated
+then make the masks one (box in line emission)
+ds9 redux/kb240904_00061_icube_2d.fits -regions load redux/kb240904_00060_icube_2d.reg -height 800 -width 1400 -zscale -mode region -smooth function boxcar -smooth radius 3 -smooth yes -regions shape box -zoom to fit &
+then two (ellipse in continuum objects)
+ds9 redux/kb240904_00061_icube.thum.fits -regions load redux/kb240904_00057_icube.thum.reg -height 800 -width 1400 -zscale -mode region -regions shape ellipse -zoom to fit &
+
+2c3) Run the rest of the reduction
+master_reduce -o sci.txt -s stage2postregToEnd
+or, if QSO saturated
+master_reduce -o sci.txt -c kcwi_qso_saturated.cfg -s stage2postregToEnd #if qso is saturated
+
+lines to mask: 4880 4841 4358 4323 4118 4085 3985 3954
+
+Now onto the stacking and astrometry procedure! See "stacking_and_astrometry_procedure_cookbook.txt"
+
+
+
+###Region Files explanation (always relevant; save as physical)###
+#Explanation from Nik on the region files needed for the background subtraction (try green or cool color map if below is meh)
+    - intk.fits: Box in all of the source emission. Be generous since we are trying to get an accurate model of the sky i.e., no source pixels at all
+    	>> ds9 kb180909_00042_intk.fits -height 1000 -width 1200 -cmap sls -zscale -regions load b180909_00042.reg -mode region -zoom to fit -regions shape box &
+    - 2d.fits: Box in emission sources/features. Look for Lya or other emission at the same wavelength in the quasars. Or for other emitting sources that may not have obvious continuum (so they are not subtracted out)
+        >> ds9 kb180909_00058_icube_2d.fits -regions load kb180909_00058_icube_2d.reg -height 1000 -width 1200 -zscale -mode region -smooth function boxcar -smooth radius 3 -smooth yes -regions shape box -zoom to fit &
+    - thum.fits: Ellipse the continuum sources. Be generous
+    	>> ds9 kb180909_00042_icube.thum.fits -regions load kb180909_00042_icube.thum.reg -height 1000 -width 1200 -zscale -mode region -regions shape ellipse -zoom to fit &
+#Different stage options
+Main: stage1drp, stage1plus, stage2drp, stage2prereg, stage2postreg, stage3drp, stage3plus, stage4drp
+Sequences: stage1plusToEnd, stage1plusToStage2pre, stage2postregToEnd 
+
+
+
+
+
+##OLD##
+#Notes from Yuguang and Nik can be found in '.../kcwi/docs/kcwi_pyDRP_instructions.txt' (https://github.com/yuguangchen1/kcwi/blob/master/pyDRP/master_reduce) OR  '.../kcwi/pyDRP/master_reduce' (https://github.com/yuguangchen1/kcwi/blob/master/docs/kcwi_pyDRP_instructions.txt)
+#Once ready check the following links to find the best way to run the commands (Option 1: https://github.com/yuguangchen1/kcwi/blob/master/docs/kcwi_pyDRP_instructions.txt)
+#From a practical standpoint follow below (uses a zsh script to run the pipeline)
+cp directory/thats/been/reduced/reduce.zsh . 
+	e.g., cp /Users/evanhazenunez/cit_data_fits/research/kcwi/q1009/raw/20171122_BM_L/KOA_81265/KCWI/raw/reduce.zsh .
+sub reduce.zsh
+  >>In text editor, change the OBJ (object) numbers and STD (standard stars)
+cp directory/thats/been/reduced/kcwi.proc ./kcwi_old.proc #Save proc file to the following
+sed -n '1p' kcwi_old.proc >> kcwi.proc #Remove every line except the first
+#rm kcwi_old.proc
+sh reduce.sh #Run the script then continue to move the "blockcomment after everytime a "Make a region files" blurb gets called to terminal (ECHO)
+
+#Copy over proc file and empty it
+> cd raw/data/directory
+> cp directory/thats/been/reduced/kcwi.proc ./kcwi_old.proc #Save proc file to raw directory
+e.g., > cp /Users/evanhazenunez/cit_data_fits/research/kcwi/q1009/raw/20171122_BM_L/KOA_81265/KCWI/raw/kcwi.proc ./kcwi_old.proc
+> sed -n '1p' kcwi_old.proc >> kcwi.proc #Remove every line except the first
+
+OPTIONAL (to just switch back to the tcsh)
+> conda deactivate #After all is said and done we can just 
+> chsh -s /bin/tcsh #change the shell back
+
+> chsh -s /bin/zsh #Change into zshell then make a new tab
+> command+t 

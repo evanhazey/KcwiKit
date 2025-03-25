@@ -1,0 +1,55 @@
+KCWI_DRP_installationnotes.txt
+#Tough time with this one gollllyyyyyy
+# Currently on MacOS Sequoia 15.2
+-> Allow Full Disk Access to terminal, XCode, XTerm (anything else needed for the terminal)
+-> Edit inputrc or tcshrc such that tab complete works or in .cshrc, may not be needed after an install
+set filec
+set autolist
+set correct=cmd
+set complete=Enhance
+
+#There were other issues regarding persmissions that after granting full access and restarting worked just fine
+e.g., read-only system (related to needing a NTFS driver for my Mac, couldn't find a setup script which is likely the Python version )
+Install XCode 16.2
+Install XCode Linetools 16.2 (no beta install)
+#Check to see if GCC and Gfortran can run 
+gcc --help
+gfortran --help
+
+# FOR INSTALLING THE OFFICIAL DRP 
+#Basically follow the commands below and I'll add in context when needed
+conda remove --name kcwidrp --all
+conda create --name kcwidrp python=3.12
+conda activate kcwidrp
+git clone https://github.com/Keck-DataReductionPipelines/KCWI_DRP.git (or git clone git@github.com:Keck-DataReductionPipelines/KCWI_DRP.git)
+cd KCWI_DRP
+pip install -e .
+#I ran into issues with cwitools so here I just "manually" install the programs it needs to run 
+pip install argparse
+pip install photutils
+pip install PyAstronomy
+pip install shapely
+pip install tqdm
+#Back to the OG setup 
+pip install -e .
+
+#FOR INSTALLING KCWIKIT KCWIDRP
+-> Follow everyhign above before gettting to "#Basically follow the commands 
+#be sure to make a new environment with Python 3.12
+conda create -n kcwikit python=3.12
+pip install MontagePy
+git clone https://github.com/yuguangchen1/KcwiKit.git
+cd KCWIKit
+pip install -e .
+#I ran into issues with cwitools so here I just "manually" install the programs it needs to run 
+pip install argparse
+pip install photutils
+pip install PyAstronomy
+pip install shapely
+pip install tqdm
+pip install -e .
+#Now to install the modified version of the drp 
+git clone https://github.com/yuguangchen1/KCWI_DRP.git
+cd KCWI_DRP 
+# "python setup.py install" did not work for me at all
+pip install -e .
