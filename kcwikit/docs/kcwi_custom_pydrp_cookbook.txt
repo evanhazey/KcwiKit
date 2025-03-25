@@ -35,12 +35,12 @@ clobber = True
 rm kcwib.proc
 -> (optional) If custom CRR mask is needed make region files on the raw frames
 ->->Draw boxes around bright traces of the cube that would be hard for the CRR to detect (do not incase obvious cosmic rays)
-ds9 kb240904_00061.fits -regions load redux/kb240904_00061_bcrr.reg -height 800 -width 1400 -cmap cool -zscale -mode region -zoom to fit -regions shape box &
+ds9 redux/kb240904_00061_intf.fits -regions load redux/kb240904_00061_bcrr.reg -height 800 -width 1400 -cmap cool -zscale -mode region -zoom to fit -regions shape box &
 -> Create binary fits mask for the region files
-python ~/python/cit_scripts/KcwiKit/kcwikit/scripts/kcwi_masksky_ds9_bcrr.py kb240904_00061.fits redux/kb240904_00061_bcrr.reg
-mv *bcrmsk* redux/
+python ~/python/cit_scripts/KcwiKit/kcwikit/scripts/kcwi_masksky_ds9_bcrr.py redux/kb240904_00054_intf.fits redux/kb240904_00054_bcrr.reg
 -> Run stage 1
-reduce_kcwi -b -f kb240904_000{57..61}.fits -g -c kcwi_qso_saturated.cfg -st 1
+reduce_kcwi -b -f kb*.fits -g -c kcwi_qso_saturated.cfg -st 1
+reduce_kcwi -b -f kb240904_000{54..61}.fits -g -c kcwi_qso_saturated.cfg -st 1
 
 ## Stage 2: Sky subtraction ##
 -> Box in continuum emission (save in Physics coords; for each object and star)
@@ -97,6 +97,7 @@ reduce_kcwi -b -f kb*.fits -g -c kcwi_qso_saturated.cfg -st 3
 
 -> Now onto stacking 
 vs /Users/evanhazenunez/cit_research/data/documentation_guides_cookbooks/stacking_and_astrometry_procedure_cookbook.txt
+
 
 ##### RED SIDE REDUCTION #####
 ## Stage 1 (fundamentals) ##
