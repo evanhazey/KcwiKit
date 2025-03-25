@@ -1,4 +1,4 @@
-#Last updated TuesJan28
+#Last updated TueMar25
 Running KCWI pipeline
   '> ' denotes that the following should be typed into the command line
 #####SETUP#####
