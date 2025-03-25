@@ -15,7 +15,7 @@ Here summarizes the typical routine with optional improvements to reduce the blu
     Create masks that box in the brightest portions of the QSO traces. Ensure the region file is named as e.g., ```kb240904_00057_bcrr.reg``` and saved in physical coordinates. Then convert the masks to binary fits images using the following example
 
     ``` bash
-    python ~path/to/kcwiki/scripts/kcwi_masksky_ds9_bcrr.py kb240904_00057.fits kb240904_00057_bcrr.reg
+    python ~path/to/kcwiki/scripts/kcwi_masksky_ds9_bcrr.py redux/kb240904_00057_intf.fits redux/kb240904_00057_bcrr.reg
     ```
 
     Toggle the bcrmsk flag and clobber in the config file [configuration file 'kcwi_qso_saturated'](../configs/kcwi_qso_saturated.cfg)
